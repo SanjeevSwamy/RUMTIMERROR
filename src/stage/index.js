@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CameraController } from './camera.js';
 import {
-  buildLed, buildResistor, buildButton, buildKnob, buildSensor,
+  buildLed, buildResistor, buildButton, buildKnob, buildSensor, buildBreadboard,
   buildServo, buildBuzzer, buildJumperWire, buildLesson, gl,
 } from '../kit/index.js';
 
@@ -257,6 +257,71 @@ export default class Stage {
     return Stage.BB_Z + side * r * 2.54;
   }
 
+  /* ----- circuit-builder workbench page ----- */
+  workbench = false;
+  _wbHidden = [];
+
+  /** hide the lesson scene, keep the breadboard + user parts so the page opens empty */
+  enterWorkbench() {
+    this.workbench = true;
+    this._wbHidden = [];
+    const keep = new Set();
+    let hasBB = false;
+    for (const p of this.parts) if (!p.fixed) keep.add(p.group);
+    for (const w of this.wires) keep.add(w.group);
+    for (const g of this._meshes) {
+      if (!g?.isObject3D || keep.has(g)) continue;
+      const isBreadboard = !g.userData?.partType && !g.userData?.connection &&
+        Math.abs((g.position?.z ?? 0) - Stage.BB_Z) < 0.5;
+      if (isBreadboard) { hasBB = true; continue; }
+      g.visible = false;
+      this._wbHidden.push(g);
+    }
+    if (!hasBB) {
+      const bb = buildBreadboard();
+      bb.position.set(0, 0, Stage.BB_Z);
+      this.scene.add(bb);
+      this._meshes.push(bb);
+      this._workbenchBB = bb;
+    } else {
+      this._workbenchBB = null;
+    }
+    if (this.wireMode) this.rebuildAnchors();
+    this.wbCam = { target: this.controls.view.target.clone(), azimuth: this.controls.view.azimuth, elevation: this.controls.view.elevation, zoom: this.controls.view.zoom };
+        this.controls.setView({ target: new THREE.Vector3(0, 0, Stage.BB_Z - 8), zoom: 9 }, 450);
+    this.dirty = true;
+  }
+
+  exitWorkbench() {
+    this.workbench = false;
+    for (const g of this._wbHidden) if (g?.isObject3D) g.visible = true;
+    this._wbHidden = [];
+    if (this._workbenchBB) {
+      this.scene.remove(this._workbenchBB);
+      this._meshes = this._meshes.filter((m) => m !== this._workbenchBB);
+      this._workbenchBB = null;
+    }
+    if (this.wbCam) {
+      this.controls.setView(this.wbCam, 450);
+      this.wbCam = null;
+    }
+    this.dirty = true;
+  }
+
+  /** ground point under a client coordinate on a horizontal plane */
+  groundPoint(clientX, clientY, y = Stage.ROW_Y) {
+    const rect = this.canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1
+    );
+    this._raycaster.setFromCamera(ndc, this.camera);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -y);
+    const out = new THREE.Vector3();
+    return this._raycaster.ray.intersectPlane(plane, out) ? { x: out.x, z: out.z } : null;
+  }
+
   addPart(type, opts = {}) {
     let group;
     if (type === 'led') group = buildLed(opts.color ?? 0xff3b30);
@@ -274,7 +339,13 @@ export default class Stage {
     group.userData.movable = true;
 
     const floor = Stage.FLOOR_PARTS.has(group.userData.partType);
-    if (floor) {
+    if (opts.at) {
+      // explicit drop point (drag & drop from the builder palette)
+      const y = floor ? 0 : Stage.ROW_Y;
+      const availZ = Math.abs(opts.at.z - Stage.BB_Z) <= 14 && !floor;
+      const z = availZ ? this.snapRow(opts.at.z) : Math.max(-110, Math.min(30, opts.at.z));
+      group.position.set(Math.max(-95, Math.min(95, opts.at.x)), y, z);
+    } else if (floor) {
       const spot = { servo: [40, 0, 42], pot: [-70, 0, -40] }[group.userData.partType] || [40, 0, -40];
       group.position.set(spot[0], spot[1], spot[2]);
       if (group.userData.partType === 'servo') group.position.x += 25 * (this.parts.filter((p) => p.type === 'servo').length % 4);
@@ -331,6 +402,7 @@ export default class Stage {
     this.wireMode = !!on;
     this._pendingAnchor = null;
     this.controls.setCursor?.(this.wireMode ? 'crosshair' : 'default');
+    this.canvas.style.cursor = this.wireMode ? 'crosshair' : 'default';
     if (this.wireMode) this.rebuildAnchors();
     else this._clearAnchors();
     this.dirty = true;

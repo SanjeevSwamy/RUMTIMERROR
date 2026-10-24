@@ -55,7 +55,8 @@ export class Sidebar {
       nav = ''
     }
     this.flyout.dataset.nav = nav
-    this.flyout.classList.toggle('is-open', nav === 'builder')
+    const onPage = document.body.dataset.view === 'builder'
+    this.flyout.classList.toggle('is-open', nav === 'builder' && !onPage)
   }
 
   _renderBuilder(H) {

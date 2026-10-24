@@ -316,7 +316,38 @@
         <div class="page-grid page-grid--parts" id="parts-page-grid"></div>
       </section>
 
-      <!-- Footer (compact layout; the wide layout keeps these in the side nav) -->
+      <section id="builder-page" class="nav-page nav-page--builder" hidden aria-label="Circuit builder">
+        <header class="builder-bar">
+          <div>
+            <h2>Circuit Builder</h2>
+            <p>Drag parts onto the breadboard &middot; wire pins &middot; press <kbd>Delete</kbd> to remove</p>
+          </div>
+          <button class="page-close" data-page-close aria-label="Close builder">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+        <div class="builder-layout">
+          <aside class="builder-side">
+            <div class="fly-palette" aria-label="Parts">
+              <button class="palette-part led" data-add="led" draggable="true">LED</button>
+              <button class="palette-part res" data-add="resistor" draggable="true">Resistor</button>
+              <button class="palette-part btn" data-add="button" draggable="true">Button</button>
+              <button class="palette-part pot" data-add="knob" draggable="true">Knob</button>
+              <button class="palette-part dist" data-add="sensor" draggable="true">Distance</button>
+              <button class="palette-part buz" data-add="buzzer" draggable="true">Buzzer</button>
+              <button class="palette-part servo" data-add="servo" draggable="true">Servo</button>
+            </div>
+            <div class="fly-tools">
+              <button class="fly-toggle" data-btool="wire" aria-pressed="false">&#9889; Wire tool</button>
+              <button class="fly-toggle" data-btool="clear">&#9000; Clear board</button>
+            </div>
+            <p class="fly-help">Drag a part button onto the canvas (or click it, then drag it in place). Wire tool: click a pin, then a row. Click or drag to move, Delete removes the selected part.</p>
+          </aside>
+          <div class="builder-canvas-wrap" id="builder-canvas-wrap"></div>
+        </div>
+      </section>
+
+
       <footer class="app-foot">
         <a class="credit credit-row" href="https://x.com/DilumSanjaya" target="_blank" rel="noopener noreferrer" title="Designed by x.com/DilumSanjaya">
           <svg class="credit-x" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.4l-5.8-7.59-6.64 7.59H.47l8.6-9.83L0 1.15h7.6l5.24 6.93zm-1.29 19.5h2.04L6.49 3.24H4.3z" /></svg>

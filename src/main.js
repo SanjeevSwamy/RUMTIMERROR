@@ -421,13 +421,22 @@ function updateParam(key, val) {
 // ─── Navigation ─────────────────────────────────────────────────────────────
 
 function onNav(key) {
+  const prev = H.nav;
   H.nav = key;
   if (key !== 'builder' && stage.wireMode) {
     stage.setWireMode(false);
   }
+  // clicking Builder while the builder page is already open takes you home
+  if (key === 'builder' && prev === 'builder' && !F('#builder-page').hidden) {
+    setPages('home');
+    H.nav = 'home';
+    sidebar.setNav('home');
+    sidebar.refresh(H);
+    return;
+  }
   if (key === 'builder') {
     stopSketch(true);
-    codeCard.appendLine?.('[Builder] drag parts from the palette; use ⚡ wire tool to connect pins.');
+    codeCard.appendLine?.('[Builder] drag parts from the palette; use \u26a1 wire tool to connect pins.');
   }
   if (key === 'run') {
     runSketch();
@@ -439,25 +448,47 @@ function onNav(key) {
 
 const lessonsPage = F('#lessons-page');
 const partsPage = F('#parts-page');
+const builderPage = F('#builder-page');
+const builderWrap = F('#builder-canvas-wrap');
+let homeStageWrap = null;
 
 function setPages(key) {
-  const open = key === 'lessons' ? lessonsPage : key === 'parts' ? partsPage : null;
-  for (const p of [lessonsPage, partsPage]) {
+  const open = key === 'lessons' ? lessonsPage
+    : key === 'parts' ? partsPage
+    : key === 'builder' ? builderPage
+    : null;
+  for (const p of [lessonsPage, partsPage, builderPage]) {
     if (p && p !== open) p.hidden = true;
   }
   if (open) open.hidden = false;
+
+  // the 3D canvas travels home <-> builder page while keeping its WebGL context
+  const canvas = F('#board-canvas');
+  if (canvas && homeStageWrap) {
+    if (open === builderPage && canvas.parentElement !== builderWrap) {
+      stage.enterWorkbench();
+      builderWrap.appendChild(canvas);
+    } else if (open !== builderPage && canvas.parentElement !== homeStageWrap) {
+      stage.exitWorkbench();
+      homeStageWrap.appendChild(canvas);
+    }
+  }
+
   document.body.dataset.view = open ? key : 'home';
 }
 
 function closePages() {
-  for (const p of [lessonsPage, partsPage]) if (p) p.hidden = true;
-  document.body.dataset.view = 'home';
+  setPages('home');
   H.nav = 'home';
   sidebar.setNav('home');
 }
 
 document.addEventListener('click', (e) => {
   if (e.target.closest('[data-page-close]')) closePages();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !builderPage?.hidden) closePages();
 });
 
 // ─── Viewbar buttons ────────────────────────────────────────────────────────
@@ -488,28 +519,63 @@ function wireViewbar() {
 function wireBuilderFlyout() {
   const fly = F('#flyout');
   if (!fly) return;
-  fly.addEventListener('click', (e) => {
-    const add = e.target.closest('[data-add]');
-    if (add) {
-      const id = stage.addPart(add.dataset.add);
-      if (id) codeCard.appendLine?.(`[Builder] added ${add.dataset.add} — drag it into place`);
-      return;
+  fly.addEventListener('click', builderPanelAction);
+}
+
+function builderPanelAction(e) {
+  const add = e.target.closest('[data-add]');
+  if (add) {
+    const id = stage.addPart(add.dataset.add);
+    if (id) codeCard.appendLine?.(`[Builder] added ${add.dataset.add} \u2014 drag it into place`);
+    return;
+  }
+  const tool = e.target.closest('[data-btool]');
+  if (tool) {
+    const kind = tool.dataset.btool;
+    if (kind === 'wire') {
+      stage.setWireMode(!stage.wireMode);
+      document.querySelectorAll('[data-btool="wire"]').forEach((b) =>
+        b.setAttribute('aria-pressed', String(stage.wireMode)));
+      codeCard.appendLine?.(stage.wireMode
+        ? '[Wire] click a pin\u2026 then click a row or another pin'
+        : '[Wire] tool off');
+    } else if (kind === 'clear') {
+      stage.clearUserWork();
+      codeCard.appendLine?.('[Builder] cleared user parts and wires');
     }
-    const tool = e.target.closest('[data-btool]');
-    if (tool) {
-      const kind = tool.dataset.btool;
-      if (kind === 'wire') {
-        stage.setWireMode(!stage.wireMode);
-        tool.setAttribute('aria-pressed', String(stage.wireMode));
-        codeCard.appendLine?.(stage.wireMode
-          ? '[Wire] click a pin… then click a row or another pin'
-          : '[Wire] tool off');
-      } else if (kind === 'clear') {
-        stage.clearUserWork();
-        codeCard.appendLine?.('[Builder] cleared user parts and wires');
-      }
+  }
+}
+
+function wireBuilderDnd() {
+  const wrap = F('#builder-canvas-wrap');
+  if (!wrap) return;
+
+  // palette buttons on any panel become draggable sources
+  document.addEventListener('dragstart', (e) => {
+    const add = e.target?.closest?.('[data-add]');
+    if (add) {
+      e.dataTransfer.setData('text/plain', add.dataset.add);
+      e.dataTransfer.effectAllowed = 'copy';
     }
   });
+
+  wrap.addEventListener('dragover', (e) => {
+    if (e.dataTransfer?.types?.includes('text/plain')) e.preventDefault();
+  });
+
+  wrap.addEventListener('drop', (e) => {
+    const type = e.dataTransfer?.getData('text/plain');
+    if (!type) return;
+    e.preventDefault();
+    const y = Stage.FLOOR_PARTS.has(type) ? 0 : Stage.ROW_Y;
+    const at = stage.groundPoint(e.clientX, e.clientY, y);
+    if (at && stage.addPart(type, { at })) {
+      codeCard.appendLine?.(`[Builder] dropped ${type} \u2014 drag it to fine-tune, then wire it up`);
+    }
+  });
+
+  // the builder page's own palette speaks the same action handler
+  F('#builder-page')?.addEventListener('click', builderPanelAction);
 }
 
 // ─── Lesson list setup ───────────────────────────────────────────────────────
@@ -690,7 +756,11 @@ async function init() {
   wireConsoleGrip();
   wireCopy();
   wireBuilderFlyout();
+  wireBuilderDnd();
   fitCompact();
+  homeStageWrap = F('#board-canvas')?.parentElement;
+  document.body.dataset.view = 'home';
+  window.__stage = stage;
 
   // Render thumbnails (async, may take a moment)
   try {
