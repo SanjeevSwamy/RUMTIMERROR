@@ -49,18 +49,13 @@ export class Sidebar {
     if (H && H.nav) this._setNavItem(H.nav)
     let nav = this._currentNav
     this.flyout.innerHTML = ''
-    if (nav === 'parts') {
-      this._renderParts(H)
-    } else if (nav === 'lessons') {
-      this._renderLessons(H)
-    } else if (nav === 'builder') {
+    if (nav === 'builder') {
       this._renderBuilder(H)
     } else {
       nav = ''
     }
     this.flyout.dataset.nav = nav
-    const show = nav === 'lessons' || nav === 'parts' || nav === 'builder'
-    this.flyout.classList.toggle('is-open', show)
+    this.flyout.classList.toggle('is-open', nav === 'builder')
   }
 
   _renderBuilder(H) {
@@ -112,46 +107,6 @@ export class Sidebar {
     help.className = 'fly-help'
     help.textContent = 'Drag parts onto the breadboard. Wire tool: click a pin, then click a row. Rotate knobs by dragging, press buttons by clicking them. Delete removes the selected part.'
     this.flyout.appendChild(help)
-  }
-
-  _renderLessons(H) {
-    this.flyout.dataset.nav = 'lessons'
-    const doneSet = (H && H.done) || new Set()
-    const items = (H && H.lessonList) || []
-    for (const lesson of items) {
-      const btn = document.createElement('button')
-      btn.className = 'fly-lesson is-current'
-      btn.setAttribute('aria-current', 'true')
-      btn.textContent = `Lesson ${lesson.index + 1}: ${lesson.title}`
-      btn.dataset.id = lesson.id
-      this.flyout.appendChild(btn)
-    }
-    void doneSet
-  }
-
-  _renderParts(H) {
-    this.flyout.dataset.nav = 'parts'
-    const inView = (H && H.partsInList) || []
-    const count = inView.length
-    const h = document.createElement('h2')
-    h.textContent = 'Components'
-    this.flyout.appendChild(h)
-    const p = document.createElement('p')
-    p.className = 'fly-count'
-    p.textContent = `${count} in view`
-    this.flyout.appendChild(p)
-    const ul = document.createElement('ul')
-    ul.className = 'fly-list'
-    for (const part of inView) {
-      const li = document.createElement('li')
-      const btn = document.createElement('button')
-      btn.className = 'fly-part'
-      btn.dataset.part = part.id
-      btn.textContent = part.label
-      li.appendChild(btn)
-      ul.appendChild(li)
-    }
-    this.flyout.appendChild(ul)
   }
 
   onSettingDo(key, next) {

@@ -13,6 +13,7 @@ import { Sidebar } from './components/Sidebar.js';
 import Stage from './stage/index.js';
 import { SimEngine } from './sim/engine.js';
 import { renderThumbnails, Oe } from './kit/thumbnails.js';
+import { PART_INFO } from './kit/board.js';
 
 // ─── Components ────────────────────────────────────────────────────────────
 
@@ -428,9 +429,36 @@ function onNav(key) {
     stopSketch(true);
     codeCard.appendLine?.('[Builder] drag parts from the palette; use ⚡ wire tool to connect pins.');
   }
+  if (key === 'run') {
+    runSketch();
+  }
+  setPages(key);
   sidebar.setNav(key);
   sidebar.refresh(H);
 }
+
+const lessonsPage = F('#lessons-page');
+const partsPage = F('#parts-page');
+
+function setPages(key) {
+  const open = key === 'lessons' ? lessonsPage : key === 'parts' ? partsPage : null;
+  for (const p of [lessonsPage, partsPage]) {
+    if (p && p !== open) p.hidden = true;
+  }
+  if (open) open.hidden = false;
+  document.body.dataset.view = open ? key : 'home';
+}
+
+function closePages() {
+  for (const p of [lessonsPage, partsPage]) if (p) p.hidden = true;
+  document.body.dataset.view = 'home';
+  H.nav = 'home';
+  sidebar.setNav('home');
+}
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-page-close]')) closePages();
+});
 
 // ─── Viewbar buttons ────────────────────────────────────────────────────────
 
@@ -515,11 +543,76 @@ function populateLessonList() {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); loadLesson(lesson.id); }
     });
     ol.append(li);
+
+    // full lessons page card
+    const pl = document.createElement('li');
+    pl.className = 'lesson page-card';
+    pl.setAttribute('role', 'button');
+    pl.tabIndex = 0;
+    pl.dataset.id = lesson.id;
+    const thumbUrlPage = Oe[lesson.thumb] || '';
+    pl.innerHTML = `
+      <img class="lesson-thumb ${thumbUrlPage ? 'is-ready' : ''}" src="${thumbUrlPage}" alt="" aria-hidden="true" width="96" height="96" />
+      <span class="page-card-meta"><span class="lesson-title">${lesson.cardTitle ?? lesson.title}</span><small>${lesson.heading ?? ''}</small></span>
+      <span class="lesson-done" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>
+      <svg class="chev" viewBox="0 0 24 24"><path d="M9 5.5 15.5 12 9 18.5"/></svg>
+    `;
+    const openLesson = () => { loadLesson(lesson.id); closePages(); };
+    pl.addEventListener('click', openLesson);
+    pl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLesson(); }
+    });
+    F('#lessons-page-grid')?.append(pl);
   });
+  paintDone();
+}
+
+// ─── Components page ─────────────────────────────────────────────────────────
+
+const PARTS_CATALOG = [
+  { type: 'led',      label: 'LED',            desc: 'Glows when a pin goes high \u2014 flash patterns, PWM, indicators.', lesson: 'blink' },
+  { type: 'resistor', label: 'Resistor',       desc: 'Limits current so LEDs and pins stay inside their safe zone.', lesson: 'blink' },
+  { type: 'button',   label: 'Pushbutton',     desc: 'Connects or breaks a circuit so code can react to a press.', lesson: 'button' },
+  { type: 'knob',     label: 'Potentiometer',  desc: 'A twist knob that turns position into an analog voltage.', lesson: 'knob' },
+  { type: 'sensor',   label: 'Distance Sensor', desc: 'HC-SR04 \u2014 pings out sound and times the echo for centimeters.', lesson: 'sensor' },
+  { type: 'buzzer',   label: 'Buzzer',         desc: 'Turns square waves into tones \u2014 beeps, alarms, and melodies.', lesson: 'sound' },
+  { type: 'servo',    label: 'Servo',          desc: 'Rotates its horn to an exact angle on demand (0\u2013180\u00b0).', lesson: 'servo' },
+];
+
+function populatePartsPage() {
+  const grid = F('#parts-page-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const makeCard = ({ title, desc, lesson, badge }) => {
+    const card = document.createElement('article');
+    card.className = 'part-card';
+    const lessonMeta = lessons.find((l) => l.id === lesson);
+    card.innerHTML = `
+      <header><h3>${title}</h3><span class="part-badge">${badge}</span></header>
+      <p>${desc}</p>
+      <button class="part-link">${lessonMeta ? `Lesson: ${lessonMeta.title}` : 'Load lesson'}</button>
+    `;
+    card.querySelector('.part-link')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (lesson) { loadLesson(lesson); closePages(); }
+    });
+    return card;
+  };
+
+  for (const part of PARTS_CATALOG) {
+    grid.append(makeCard({ title: part.label, desc: part.desc, lesson: part.lesson, badge: 'part' }));
+  }
+  for (const [key, info] of Object.entries(PART_INFO)) {
+    grid.append(makeCard({ title: info.name, desc: info.desc, lesson: 'board', badge: 'Uno board' }));
+    void key;
+  }
 }
 
 function paintDone() {
   F('#lesson-list')?.querySelectorAll('[data-id]').forEach((li) => {
+    li.classList.toggle('is-done', H.done.has(li.dataset.id));
+  });
+  F('#lessons-page-grid')?.querySelectorAll('[data-id]').forEach((li) => {
     li.classList.toggle('is-done', H.done.has(li.dataset.id));
   });
 }
@@ -608,6 +701,7 @@ async function init() {
 
   // Populate lesson list now that Oe may be filled
   populateLessonList();
+  populatePartsPage();
   paintDone();
 
   // Load first lesson

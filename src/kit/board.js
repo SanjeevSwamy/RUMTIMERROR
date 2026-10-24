@@ -235,6 +235,26 @@ export function createPcbTexture() {
   return tex;
 }
 
+/** catalogue of clickable board regions, shared with the components page */
+export const PART_INFO = {
+  usb:       { name: 'USB-B Port',      desc: 'USB Type-B connector \u2014 programs the board from a computer and powers it with 5V.' },
+  jack:      { name: 'DC Barrel Jack',  desc: '2.1mm power jack \u2014 feed it 7\u201312V DC for use away from a computer.' },
+  mcu:       { name: 'ATmega328P',      desc: 'The main microcontroller \u2014 a DIP-28 chip that stores and runs your sketch.' },
+  hex16u2:   { name: 'ATmega16U2',      desc: 'A small control chip that bridges USB to the serial line for uploads.' },
+  crystal:   { name: '16 MHz Crystal',  desc: 'The quartz heartbeat of the board \u2014 sets the exact clock for the ATmega328P.' },
+  ecap1:     { name: '47\u00b5F Capacitor', desc: 'Bridges supply dips on the 5V rail \u2014 keeps power smooth and steady.' },
+  ecap2:     { name: '47\u00b5F Capacitor', desc: 'Bridges supply dips on the 5V rail \u2014 keeps power smooth and steady.' },
+  reset:     { name: 'RESET Button',    desc: 'Press to restart the microcontroller \u2014 your sketch reboots from the top.' },
+  regulator: { name: '5V Regulator',    desc: 'Takes raw input (jack or USB) and delivers a steady 5V to logic and headers.' },
+  icspA:     { name: 'ICSP Header',     desc: '6-pin header for flashing the main chip directly \u2014 bootloader territory.' },
+  icspB:     { name: 'ICSP Header',     desc: 'Used to reprogram the ATmega16U2 \u2014 rare, but handy if the bridge is bricked.' },
+  leds:      { name: 'Onboard LEDs',    desc: 'Status lights: L (D13), TX/RX (serial chatter), and ON (power present).' },
+  headerA:   { name: 'Digital Headers', desc: 'Digital pins 8\u201313 with SCL, SDA, AREF and GND \u2014 sockets for your loop wires.' },
+  headerB:   { name: 'Digital Headers', desc: 'Digital pins 0\u20137 \u2014 serial pins RX/TX live here, plus six more GPIO.' },
+  headerP:   { name: 'Power Header',    desc: 'IOREF, RESET, 3.3V, 5V, GND and VIN \u2014 power tap for your circuits.' },
+  headerAn:  { name: 'Analog Header',   desc: 'A0\u2013A5 sockets \u2014 analog inputs that read voltages 0\u20135V.' },
+};
+
 /** authentic Arduino Uno R3, board-relative coordinates, silk + pick zones */
 export function buildArduinoUno() {
   const root = new Group();
@@ -430,24 +450,6 @@ export function buildArduinoUno() {
   });
 
   // 13. Clickable part zones (invisible AABB volumes for raycast picking)
-  const PART_INFO = {
-    usb:       { name: 'USB-B Port',      desc: 'USB Type-B connector \u2014 programs the board from a computer and powers it with 5V.' },
-    jack:      { name: 'DC Barrel Jack',  desc: '2.1mm power jack \u2014 feed it 7\u201312V DC for use away from a computer.' },
-    mcu:       { name: 'ATmega328P',      desc: 'The main microcontroller \u2014 a DIP-28 chip that stores and runs your sketch.' },
-    hex16u2:   { name: 'ATmega16U2',      desc: 'A small control chip that bridges USB to the serial line for uploads.' },
-    crystal:   { name: '16 MHz Crystal',  desc: 'The quartz heartbeat of the board \u2014 sets the exact clock for the ATmega328P.' },
-    ecap1:     { name: '47\u00b5F Capacitor', desc: 'Bridges supply dips on the 5V rail \u2014 keeps power smooth and steady.' },
-    ecap2:     { name: '47\u00b5F Capacitor', desc: 'Bridges supply dips on the 5V rail \u2014 keeps power smooth and steady.' },
-    reset:     { name: 'RESET Button',    desc: 'Press to restart the microcontroller \u2014 your sketch reboots from the top.' },
-    regulator: { name: '5V Regulator',    desc: 'Takes raw input (jack or USB) and delivers a steady 5V to logic and headers.' },
-    icspA:     { name: 'ICSP Header',     desc: '6-pin header for flashing the main chip directly \u2014 bootloader territory.' },
-    icspB:     { name: 'ICSP Header',     desc: 'Used to reprogram the ATmega16U2 \u2014 rare, but handy if the bridge is bricked.' },
-    leds:      { name: 'Onboard LEDs',    desc: 'Status lights: L (D13), TX/RX (serial chatter), and ON (power present).' },
-    headerA:   { name: 'Digital Headers', desc: 'Digital pins 8\u201313 with SCL, SDA, AREF and GND \u2014 sockets for your loop wires.' },
-    headerB:   { name: 'Digital Headers', desc: 'Digital pins 0\u20137 \u2014 serial pins RX/TX live here, plus six more GPIO.' },
-    headerP:   { name: 'Power Header',    desc: 'IOREF, RESET, 3.3V, 5V, GND and VIN \u2014 power tap for your circuits.' },
-    headerAn:  { name: 'Analog Header',   desc: 'A0\u2013A5 sockets \u2014 analog inputs that read voltages 0\u20135V.' },
-  };
   const zoneMat = new MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, opacity: 0 });
   const ZONES = [
     ['usb',       1.8,  38.1, 9.2, 11.6, 11],
