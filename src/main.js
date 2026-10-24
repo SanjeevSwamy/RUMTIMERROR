@@ -597,6 +597,7 @@ async function init() {
   wireConsoleGrip();
   wireCopy();
   wireBuilderFlyout();
+  fitCompact();
 
   // Render thumbnails (async, may take a moment)
   try {
@@ -625,6 +626,13 @@ async function init() {
       loader.hidden = true;
     }, 400);
   }
+}
+
+function fitCompact() {
+  const toggle = () => document.documentElement.classList.toggle(
+    'compact', window.innerWidth < 1240 || window.innerHeight < 560);
+  toggle();
+  window.addEventListener('resize', toggle);
 }
 
 init().catch(console.error);

@@ -41,3 +41,17 @@
 /* wire-mode cursor hint on the stage */
 .rig[data-wire-mode="true"] #board-canvas{ cursor:crosshair; }
 .side-nav li:nth-child(6){top:574px}.side-nav li:nth-child(7){top:662px}
+
+/* ===== Home layout fix: fluid artboard + compact switch ===== */
+html:not(.compact) .artboard{width:100%;height:100dvh;position:relative}
+html.compact .artboard{position:relative}
+.status{right:24px}
+.info-card{right:24px}
+.code-card{right:24px}
+.lessons{left:80px}
+@media (height <= 870px) and (not (width <= 600px)) {
+  .code-card{top:auto;bottom:182px}
+  .info-card{top:110px;height:auto;bottom:460px}
+  .stage{bottom:140px}
+  .info-card .info-body{overflow:auto}
+}
