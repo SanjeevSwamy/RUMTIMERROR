@@ -361,7 +361,14 @@ function runSketch() {
       const num = /^D(\d+)$/.exec(name);
       const pinNum = num ? Number(num[1]) : -1;
       const boundPins = bindsDef().buttons ?? [];
-      if (boundPins.includes(pinNum) && stage.buttonPressed) return 0;
+      if (boundPins.includes(pinNum)) {
+        // In Lesson 9 (piano), INPUT_PULLUP is used: active LOW
+        if (H.lessonId === 'piano') {
+          return stage.buttonPressed ? 0 : 1;
+        }
+        // In Lesson 3 (button), active HIGH pull-down is wired: pressed = 1 (HIGH), released = 0 (LOW)
+        return stage.buttonPressed ? 1 : 0;
+      }
       return 1;
     },
     readAnalog: (pin) => {
