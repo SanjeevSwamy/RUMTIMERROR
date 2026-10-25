@@ -481,6 +481,7 @@ export function buildArduinoUno() {
     partHighlighters[key].push(zone);
   });
 
+  root.userData.isBoardRoot = true;
   // Return root and map of pin coordinates in 3D world space
   const pins = {};
   const digNames = ['SCL', 'SDA', 'AREF', 'GND', 'D13', 'D12', 'D11', 'D10', 'D9', 'D8', 'D7', 'D6', 'D5', 'D4', 'D3', 'D2', 'D1', 'D0'];

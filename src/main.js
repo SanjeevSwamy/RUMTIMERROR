@@ -214,9 +214,15 @@ function pinName(n) {
 }
 
 /** Build part-binding maps for the current lesson, user wires first. */
+const BUILDER_DEF = {
+  leds: ['D13'], servos: ['D9'], buttons: ['D2'], buzzers: ['D8'], pot: 'A0',
+};
+function bindsDef() {
+  return H.view === 'builder' ? BUILDER_DEF : (LESSON_BINDS[H.lessonId] ?? {});
+}
 function buildBindings() {
   const binds = { leds: new Map(), buttons: new Set(), potIds: new Set(), servos: new Set(), buzzers: new Set(), sensor: null, wiredLeds: new Map() };
-  const def = LESSON_BINDS[H.lessonId] ?? {};
+  const def = bindsDef();
   const userWiresExist = stage.wires.length > 0;
 
   // DSU over wire nets
@@ -226,6 +232,8 @@ function buildBindings() {
 
   const ledger = { ledIdx: 0, btnIdx: 0, buzzIdx: 0, servoIdx: 0 };
   for (const part of stage.parts) {
+    // hidden lesson parts (e.g. workbench view) still exist in scene graph; they bind nothing
+    if (part.group.visible === false) continue;
     switch (part.type) {
       case 'led':
         // Nth pre-placed LED takes the Nth default pin; user-wired LEDs override via nets
@@ -322,7 +330,9 @@ function runSketch() {
       const name = pinName(pin);
       const num = /^D(\d+)$/.exec(name);
       const pinNum = num ? Number(num[1]) : -1;
-      const glow = typeof v === 'number' ? Math.max(0, Math.min(1, v / 255)) : (v ? 1 : 0);
+      const glow = typeof v === 'number'
+        ? (v > 1 ? Math.max(0, Math.min(1, v / 255)) : (v ? 1 : 0))
+        : (v ? 1 : 0);
       // board L LED mirrors pin 13 directly
       if (pinNum === 13) stage.setBoardLed('L', v);
       // wired LEDs (user-built circuits), then default-bound LEDs
@@ -350,13 +360,13 @@ function runSketch() {
       const name = pinName(pin);
       const num = /^D(\d+)$/.exec(name);
       const pinNum = num ? Number(num[1]) : -1;
-      const boundPins = LESSON_BINDS[H.lessonId]?.buttons ?? [];
+      const boundPins = bindsDef().buttons ?? [];
       if (boundPins.includes(pinNum) && stage.buttonPressed) return 0;
       return 1;
     },
     readAnalog: (pin) => {
       const name = pinName(pin);
-      const lessonDef = LESSON_BINDS[H.lessonId] ?? {};
+      const lessonDef = bindsDef();
       for (const id of binds.potIds) {
         if (name === (lessonDef.pot ?? 'A0')) return stage.potValue(id);
       }
@@ -368,10 +378,12 @@ function runSketch() {
       const distCm = stage.sensorDist ?? 18;
       return Math.round(distCm * 58); // µs round trip
     },
+    hookLine: (n) => codeCard.highlightLine?.(n),
   });
 
   if (sim.error) {
     codeCard.appendLine?.(`⚠ Compile error: ${sim.error}`);
+    codeCard.clearTrace?.();
     sim = null;
     codeCard.setState?.('idle');
     H.running = false;
@@ -406,6 +418,7 @@ function stopSketch(quiet = false) {
   sim?.stop();
   sim = null;
   stopTone();
+  codeCard.clearTrace?.();
   stage.resetDeviceVisuals();
   codeCard.setState?.('idle');
   H.running = false;
@@ -461,15 +474,22 @@ function setPages(key) {
     if (p && p !== open) p.hidden = true;
   }
   if (open) open.hidden = false;
+  H.view = open ? key : 'home';
 
-  // the 3D canvas travels home <-> builder page while keeping its WebGL context
+  // the 3D canvas + code card travel home <-> builder page (WebGL context survives)
   const canvas = F('#board-canvas');
+  const codeEl = codeCard.el ?? F('.code-card');
   if (canvas && homeStageWrap) {
     if (open === builderPage && canvas.parentElement !== builderWrap) {
       stage.enterWorkbench();
+      if (codeEl && codeEl.parentElement !== builderWrap) {
+        setPages._codeHome ??= codeEl.parentElement;
+        builderWrap.appendChild(codeEl);
+      }
       builderWrap.appendChild(canvas);
     } else if (open !== builderPage && canvas.parentElement !== homeStageWrap) {
       stage.exitWorkbench();
+      if (codeEl && setPages._codeHome) setPages._codeHome.appendChild(codeEl);
       homeStageWrap.appendChild(canvas);
     }
   }

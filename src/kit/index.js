@@ -113,7 +113,7 @@ export function buildLed(colorHex = 0xff3b30) {
   const matLens = new THREE.MeshPhysicalMaterial({
     color: colorHex,
     emissive: colorHex,
-    emissiveIntensity: 0.4,
+    emissiveIntensity: 0.05,
     roughness: 0.15,
     transmission: 0.85,
     thickness: 2.5,
@@ -128,7 +128,13 @@ export function buildLed(colorHex = 0xff3b30) {
   const cap = new THREE.Mesh(capGeom, matLens);
   cap.position.y = 5;
   const collar = cyl(2.8, 2.8, 1.0, 20, matLens, 0, -1.0, 0);
-  group.userData = { partType: 'led', colorHex };
+
+  // Soft omni glow light for scene realism when illuminated
+  const glowLight = new THREE.PointLight(colorHex, 0, 30, 2);
+  glowLight.position.set(0, 4, 0);
+  group.add(glowLight);
+
+  group.userData = { partType: 'led', colorHex, lensMat: matLens, glowLight };
   group.add(dome, cap, collar);
 
   // Wire leads
@@ -315,6 +321,7 @@ export function buildServo() {
   const cable = cyl(1.6, 1.6, 6.0, 10, matWire, -9.0, -3.0, 5.0);
   group.add(cable);
 
+  group.userData = { partType: 'servo' };
   return group;
 }
 
@@ -424,6 +431,7 @@ export function buildLesson(scene, lesson) {
       res.position.set(0, 8.5, -62.54);
       scene.add(led, res);
       meshes.push(led, res);
+      parts.push(led, res);
 
       // Wire D13 to breadboard pin
       const w1 = buildJumperWire(boardPins.D13, new THREE.Vector3(-5.08, 8.5, -62.54), 0xf5b444, 18, 'D13 → resistor row');
@@ -440,6 +448,7 @@ export function buildLesson(scene, lesson) {
       res.position.set(12.7, 8.5, -60);
       scene.add(btn, res);
       meshes.push(btn, res);
+      parts.push(btn, res);
 
       const w1 = buildJumperWire(boardPins['5V'], new THREE.Vector3(-7.62, 8.5, -86.5), 0xd64a3a, 26, '5V → red power rail');
       const w2 = buildJumperWire(boardPins.D2, new THREE.Vector3(-5.08, 8.5, -62.54), 0x3d6fc4, 18, 'D2 → button leg row');
@@ -453,6 +462,7 @@ export function buildLesson(scene, lesson) {
       pot.position.set(0, 8.5, -65.08);
       scene.add(pot);
       meshes.push(pot);
+      parts.push(pot);
 
       const w1 = buildJumperWire(boardPins['5V'], new THREE.Vector3(-5.08, 8.5, -62.54), 0xd64a3a, 24, '5V → pot supply row');
       const w2 = buildJumperWire(boardPins.A0, new THREE.Vector3(0, 8.5, -62.54), 0x30a050, 20, 'A0 → pot wiper row');
@@ -467,6 +477,7 @@ export function buildLesson(scene, lesson) {
       const ledB = buildLed(0x007aff); ledB.position.set(6.35, 8.5, -62.54);
       scene.add(ledR, ledG, ledB);
       meshes.push(ledR, ledG, ledB);
+      parts.push(ledR, ledG, ledB);
 
       const w1 = buildJumperWire(boardPins.D9, new THREE.Vector3(-7.62, 8.5, -62.54), 0xff3b30, 16, 'D9 → red LED row');
       const w2 = buildJumperWire(boardPins.D10, new THREE.Vector3(2.54, 8.5, -62.54), 0x34c759, 18, 'D10 → green LED row');
@@ -480,6 +491,7 @@ export function buildLesson(scene, lesson) {
       s.position.set(1.27, 8.5, -64.7);
       scene.add(s);
       meshes.push(s);
+      parts.push(s);
 
       const w1 = buildJumperWire(boardPins['5V'], new THREE.Vector3(-2.54, 8.5, -72.7), 0xd64a3a, 28, '5V → sensor VCC');
       const w2 = buildJumperWire(boardPins.D9, new THREE.Vector3(0, 8.5, -72.7), 0xf5b444, 24, 'D9 → sensor Trig');
@@ -494,6 +506,7 @@ export function buildLesson(scene, lesson) {
       sv.position.set(60, 0, -60);
       scene.add(sv);
       meshes.push(sv);
+      parts.push(sv);
 
       const w1 = buildJumperWire(boardPins['5V'], new THREE.Vector3(48, 0, -46), 0xd64a3a, 26, '5V → servo red lead');
       const w2 = buildJumperWire(boardPins.D9, new THREE.Vector3(52, 0, -46), 0xf5b444, 24, 'D9 → servo signal lead');
@@ -508,6 +521,7 @@ export function buildLesson(scene, lesson) {
       bz.position.set(0, 8.5, -62.54);
       scene.add(bz);
       meshes.push(bz);
+      parts.push(bz);
 
       const w1 = buildJumperWire(boardPins.D8, new THREE.Vector3(-2.54, 8.5, -65.08), 0xf5b444, 18, 'D8 → buzzer + row');
       const w2 = buildJumperWire(boardPins.GND, new THREE.Vector3(2.54, 8.5, -65.08), 0x22252a, 20, 'GND → buzzer − row');
@@ -520,9 +534,10 @@ export function buildLesson(scene, lesson) {
       led.position.set(0, 8.5, -62.54);
       scene.add(led);
       meshes.push(led);
+      parts.push(led);
       break;
     }
   }
 
-  return { meshes, pins: boardPins };
+  return { meshes, parts, pins: boardPins, leds: boardLeds };
 }

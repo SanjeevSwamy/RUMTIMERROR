@@ -103,6 +103,7 @@ export class SimEngine {
       hookNoTone: hooks.hookNoTone ?? null,
       hookServo: hooks.hookServo ?? null,
       hookStepper: hooks.hookStepper ?? null,
+      hookLine: hooks.hookLine ?? null,
       readPin: hooks.readPin ?? null,
       readAnalog: hooks.readAnalog ?? null,
       pulseEcho: hooks.pulseEcho ?? null,
@@ -163,6 +164,8 @@ export class SimEngine {
       ...CONSTANTS, pinMode, digitalRead, digitalWrite, analogRead, analogWrite,
       delay, delayMicroseconds, millis, micros, pulseIn, tone, noTone,
       Serial: this.Serial,
+      // execute-line tracer (sync, no yield — highlights should never stall sketch timing)
+      trace: (n) => { const h = engine.hooks.hookLine; if (h) h(n); },
       // bind Servo/Stepper instances to *this* engine, not whatever engine was
       // current when the sketch factory ran (compile happens in the constructor)
       Servo: class extends Servo { constructor() { super(engine); } },
@@ -182,7 +185,8 @@ export class SimEngine {
                map, OUTPUT, INPUT, INPUT_PULLUP, HIGH, LOW, LED_BUILTIN,
                A0, A1, A2, A3, A4, A5 } = api;
          const Serial = api.Serial;
-         void Serial; void map;
+         const __trace = api.trace ?? (() => {});
+         void Serial; void map; void __trace;
          ${js}
          return { setup: typeof setup === 'function' ? setup : null,
                   loop:  typeof loop  === 'function' ? loop  : null };`
@@ -227,13 +231,48 @@ export class SimEngine {
 }
 
 /**
+ * Prepend `__trace(lineNo);` to every code line so the host can highlight the
+ * statement the MCU is currently executing. Coment/blank/brace-close lines are
+ * left untouched (a trace before `}` would still be legal, but pointless).
+ */
+function _instrument(src) {
+  const lines = String(src).split('\n');
+  let inBlock = false;
+  const out = new Array(lines.length);
+  for (let i = 0; i < lines.length; i++) {
+    const ln = lines[i];
+    let code = '';
+    let j = 0;
+    while (j < ln.length) {
+      const ch = ln[j];
+      const nx = ln[j + 1];
+      if (inBlock) {
+        if (ch === '*' && nx === '/') { inBlock = false; j += 2; continue; }
+        j += 1; continue;
+      }
+      if (ch === '/' && nx === '*') { inBlock = true; j += 2; continue; }
+      if (ch === '/' && nx === '/') break;
+      code += ch; j += 1;
+    }
+    const bare = code.trimStart();
+    const first = bare[0];
+    if (!bare || first === '#' || first === '}' || first === ']' || first === ')' || /^else\b/.test(bare)) {
+      out[i] = ln;
+      continue;
+    }
+    out[i] = `__trace(${i + 1});` + ln;
+  }
+  return out.join('\n');
+}
+
+/**
  * Very lenient down-compile of the sketch subset used by the lessons.
  * Handles: comments, #include, #define, typed declarations (int/byte/float/const),
  * Serial/Millis-ish calls, tells loop()/setup() to be async and awaits delay-ish
  * calls, misc C++ shorthands (bool, true/false), Servo/Stepper instances.
  */
 export function transpile(src) {
-  let js = String(src);
+  let js = _instrument(src);
 
   // strip block comments + line comments + preprocessor
   js = js.replace(/\/\*[\s\S]*?\*\//g, ' ');

@@ -13,7 +13,7 @@ import { chromium } from 'playwright';
 
   // 1. Test clicking "Blink an LED"
   console.log('Testing clicking lesson: blink...');
-  const blinkCard = page.locator('.lesson[data-id="blink"]');
+  const blinkCard = page.locator('#lesson-list .lesson[data-id="blink"]');
   await blinkCard.click();
   await page.waitForTimeout(500);
 

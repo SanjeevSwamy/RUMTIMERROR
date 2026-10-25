@@ -271,6 +271,8 @@ export default class Stage {
     for (const w of this.wires) keep.add(w.group);
     for (const g of this._meshes) {
       if (!g?.isObject3D || keep.has(g)) continue;
+      // the Uno board is the centerpiece of the workbench; keep it visible
+      if (g.userData?.isBoardRoot) continue;
       const isBreadboard = !g.userData?.partType && !g.userData?.connection &&
         Math.abs((g.position?.z ?? 0) - Stage.BB_Z) < 0.5;
       if (isBreadboard) { hasBB = true; continue; }
@@ -288,7 +290,7 @@ export default class Stage {
     }
     if (this.wireMode) this.rebuildAnchors();
     this.wbCam = { target: this.controls.view.target.clone(), azimuth: this.controls.view.azimuth, elevation: this.controls.view.elevation, zoom: this.controls.view.zoom };
-        this.controls.setView({ target: new THREE.Vector3(0, 0, Stage.BB_Z - 8), zoom: 9 }, 450);
+        this.controls.setView({ target: new THREE.Vector3(0, 0, -30), zoom: 7.2 }, 450);
     this.dirty = true;
   }
 
@@ -451,23 +453,8 @@ export default class Stage {
     }
     // part feet (snap to nearby tie column node so nets connect through the breadboard)
     for (const entry of this.parts) {
-      const feet = Stage.FEET[entry.type];
-      if (!feet) continue;
-      feet.forEach((f, i) => {
-        const world = entry.group.localToWorld(new THREE.Vector3(f[0], f[1], f[2]));
-        let node = `foot:${entry.id}:${i}`;
-        let label = `${entry.type} pin ${i + 1}`;
-        for (let dz of [-12.7, -10.16, -7.62, -5.08, -2.54, 2.54, 5.08, 7.62, 10.16, 12.7]) {
-          if (Math.abs(world.z - (Stage.BB_Z + dz)) < 1.0) {
-            const side = dz < 0 ? 'N' : 'S';
-            const c = Math.round(world.x / 2.54);
-            node = `bb:${c}:${side}`;
-            label = `${entry.type} pin ${i + 1} (row ${this._rowLabel(c, side)})`;
-            break;
-          }
-        }
-        out(label, node, world);
-      });
+      if (entry.group.visible === false) continue; // hidden lesson parts offer no feet
+      for (const a of this.anchorsForPart(entry)) out(a.label, a.node, a.world);
     }
     // dedupe: two anchors may share node+position (e.g. a foot sitting on a row)
     const seen = new Map();
@@ -483,6 +470,31 @@ export default class Stage {
     // Tinkercad-style labels: A/1..27 in, rows grid
     const col = c + 14; // 1..27 notional letters unnecessary; use number
     return side === 'N' ? `${col}-N` : `${col}-S`;
+  }
+
+  /** anchor (node/label/world) for each foot of one part — shared by the
+   *  wire-tool rendering, the circuit net builder and the agent chat. */
+  anchorsForPart(entry) {
+    const feet = Stage.FEET[entry.type];
+    if (!feet) return [];
+    const world0 = new THREE.Vector3();
+    const anchors = [];
+    feet.forEach((f, i) => {
+      const world = entry.group.localToWorld(world0.set(f[0], f[1], f[2]));
+      let node = `foot:${entry.id}:${i}`;
+      let label = `${entry.type} pin ${i + 1}`;
+      for (const dz of [-12.7, -10.16, -7.62, -5.08, -2.54, 2.54, 5.08, 7.62, 10.16, 12.7]) {
+        if (Math.abs(world.z - (Stage.BB_Z + dz)) < 1.0) {
+          const side = dz < 0 ? 'N' : 'S';
+          const c = Math.round(world.x / 2.54);
+          node = `bb:${c}:${side}`;
+          label = `${entry.type} pin ${i + 1} (row ${this._rowLabel(c, side)})`;
+          break;
+        }
+      }
+      anchors.push({ i, node, label, world: world.clone(), onBoard: node.startsWith('bb:') });
+    });
+    return anchors;
   }
 
   rebuildAnchors() {
@@ -712,14 +724,18 @@ export default class Stage {
   resetDeviceVisuals() {
     for (const key of Object.keys(this.boardLeds ?? {})) this.setBoardLed(key, 0);
     for (const entry of this.parts) {
-      if (entry.type === 'led') entry.group.traverse((o) => {
-        if (o.isMesh && o.material?.emissive) o.material.emissiveIntensity = 0;
-      });
+      if (entry.type === 'led') {
+        entry.group.traverse((o) => {
+          if (o.isMesh && o.material?.emissive) o.material.emissiveIntensity = 0.05;
+        });
+        if (entry.group.userData?.glowLight) entry.group.userData.glowLight.intensity = 0;
+      }
       if (entry.type === 'servo') {
         // reset horn to 90° neutral
         entry.group.traverse((o) => { if (o.userData?.isHorn) o.rotation.y = -Math.PI / 2; });
       }
     }
+    this.dirty = true;
   }
 
   setLedGlow(id, glow) {
@@ -727,8 +743,13 @@ export default class Stage {
     if (!entry || entry.type !== 'led') return;
     const g = Math.max(0, Math.min(1, glow));
     entry.group.traverse((o) => {
-      if (o.isMesh && o.material?.emissive) o.material.emissiveIntensity = g * 1.6;
+      if (o.isMesh && o.material?.emissive) {
+        o.material.emissiveIntensity = 0.05 + g * 1.8;
+      }
     });
+    if (entry.group.userData?.glowLight) {
+      entry.group.userData.glowLight.intensity = g * 1.5;
+    }
     this.dirty = true;
   }
 

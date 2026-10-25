@@ -99,3 +99,10 @@ html.compact .artboard{position:relative}
 @media (width<=600px){.builder-side{width:100%;border-right:0;border-bottom:1.5px solid var(--line);max-height:34vh}.builder-layout{flex-direction:column}}
 .nav-page~.sidebar,.sidebar{z-index:50}
 .flyout{z-index:49}
+
+/* code card rides along into the builder page, anchored over the canvas */
+.builder-canvas-wrap .code-card{position:absolute;top:18px;right:18px;left:auto;bottom:auto;width:min(440px,82%);max-height:calc(100% - 36px);overflow:auto;z-index:6}
+
+/* runtime trace: the line the sketch engine is executing */
+.code-card code span.is-traced{background:rgba(255,176,0,.28);border-radius:3px;box-shadow:0 0 0 2px rgba(255,176,0,.22)}
+.code-card code span{border-radius:3px}

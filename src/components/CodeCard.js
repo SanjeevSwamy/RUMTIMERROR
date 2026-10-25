@@ -35,6 +35,13 @@ export class CodeCard {
     this.consoleText = el ? (el.querySelector('.console-lines') || el.querySelector('.console-text')) : null
     this.codeEl = el ? el.querySelector('code') : null
 
+    // the code area is contenteditable; keep _code in sync or typed edits never compile
+    if (this.codeEl) {
+      this.codeEl.addEventListener('input', () => {
+        this._code = this.codeEl.textContent ?? ''
+      })
+    }
+
     if (this.btnRun) this.btnRun.addEventListener('click', () => this._toggleRun())
     if (this.btnCopy) {
       this.btnCopy.addEventListener('click', async () => {
@@ -78,13 +85,65 @@ export class CodeCard {
     } else {
       this._code = ''
     }
-    if (this.codeEl) this.codeEl.textContent = this._code
+    this.renderFormattedCode(this._code)
     el_setState(this.el, 'idle')
     if (this.consoleText) this.consoleText.textContent = ''
   }
 
+  renderFormattedCode(text) {
+    if (!this.codeEl) return
+    const lines = (text ?? '').split('\n')
+    this._traceSpans = []
+    this._traceSpanCount = lines.length
+    this._traceLine = null
+    this.codeEl.innerHTML = ''
+    const frag = document.createDocumentFragment()
+    lines.forEach((lineText, idx) => {
+      const lineSpan = document.createElement('span')
+      lineSpan.className = 'line'
+      lineSpan.dataset.l = String(idx + 1)
+      const ln = document.createElement('span')
+      ln.className = 'ln'
+      ln.textContent = String(idx + 1)
+      lineSpan.appendChild(ln)
+      const codeSpan = document.createElement('span')
+      codeSpan.className = 'code-text'
+      codeSpan.textContent = lineText || ' '
+      lineSpan.appendChild(codeSpan)
+      frag.appendChild(lineSpan)
+      this._traceSpans.push(lineSpan)
+    })
+    this.codeEl.appendChild(frag)
+  }
+
   getCode() {
     return this._code
+  }
+
+  // ─── runtime line tracing ──────────────────────────────────────────────────
+  highlightLine(n) {
+    if (!this.codeEl || !n || n === this._traceLine) return
+    const isRunning = this.el?.getAttribute('data-state') === 'running'
+    if (!isRunning) return
+    if (!this._traceSpans || this._traceSpans.length === 0) {
+      this.renderFormattedCode(this._code)
+    }
+    if (this._traceLine != null && this._traceSpans[this._traceLine - 1]) {
+      this._traceSpans[this._traceLine - 1].classList.remove('is-running', 'is-traced')
+    }
+    this._traceLine = n
+    const span = this._traceSpans[n - 1]
+    if (span) {
+      span.classList.add('is-running', 'is-traced')
+      span.scrollIntoView({ block: 'nearest' })
+    }
+  }
+
+  clearTrace() {
+    if (this._traceLine != null && this._traceSpans?.[this._traceLine - 1]) {
+      this._traceSpans[this._traceLine - 1].classList.remove('is-running', 'is-traced')
+    }
+    this._traceLine = null
   }
 
   setToggle(on) {
