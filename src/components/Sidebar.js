@@ -77,7 +77,7 @@ export class Sidebar {
       ['button', 'Button', 'btn'],
       ['knob', 'Knob', 'pot'],
       ['sensor', 'Distance', 'dist'],
-      ['buzzer', 'Buzzer', 'buz'],
+      ['buzzer', 'Buzzer', 'buz', 'buzzzzzzz'],
       ['servo', 'Servo', 'servo'],
     ]
     for (const [add, label, cls] of items) {
